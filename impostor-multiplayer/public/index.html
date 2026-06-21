@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Impostor Game 🕵️</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a26;--border:#2a2a3e;
+  --purple:#7c6ef0;--purple-light:#a89af7;--purple-dim:#3d3670;
+  --red:#f05a5a;--red-dim:#5c2020;--green:#4ade80;--yellow:#f5c842;
+  --text:#e8e6ff;--text-muted:#7a7a9a;--text-dim:#3a3a5a;
+  --mono:'Space Mono',monospace;--sans:'Space Grotesk',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:radial-gradient(1px 1px at 10% 15%,rgba(255,255,255,.3) 0%,transparent 100%),
+  radial-gradient(1px 1px at 30% 60%,rgba(255,255,255,.2) 0%,transparent 100%),
+  radial-gradient(1.5px 1.5px at 55% 25%,rgba(255,255,255,.25) 0%,transparent 100%),
+  radial-gradient(1px 1px at 70% 80%,rgba(255,255,255,.2) 0%,transparent 100%),
+  radial-gradient(1px 1px at 85% 45%,rgba(255,255,255,.15) 0%,transparent 100%),
+  radial-gradient(1px 1px at 20% 85%,rgba(255,255,255,.1) 0%,transparent 100%),
+  radial-gradient(1px 1px at 92% 10%,rgba(255,255,255,.25) 0%,transparent 100%),
+  radial-gradient(1px 1px at 42% 50%,rgba(255,255,255,.1) 0%,transparent 100%);}
+
+.app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:1.2rem 1rem 5rem}
+
+/* screens */
+.screen{display:none;width:100%;max-width:520px}
+.screen.active{display:block;animation:fadeUp .4s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes glitch{0%,88%,100%{transform:translate(0)}90%{transform:translate(-3px,1px)}92%{transform:translate(3px,-1px)}94%{transform:translate(-2px,2px)}96%{transform:translate(2px,-2px)}}
+@keyframes ripple{0%{transform:scale(.8);opacity:1}100%{transform:scale(2.4);opacity:0}}
+@keyframes popIn{0%{transform:scale(0);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes timerWarn{0%,100%{box-shadow:0 0 0 rgba(240,90,90,0)}50%{box-shadow:0 0 28px rgba(240,90,90,.5)}}
+@keyframes confettiFall{0%{transform:translateY(-10px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+@keyframes scanline{0%{left:-100%}100%{left:200%}}
+
+/* logo */
+.logo{text-align:center;margin-bottom:1.5rem;margin-top:.5rem}
+.logo-icon{font-size:46px;display:block;margin-bottom:.3rem;animation:floatY 3s ease-in-out infinite}
+.logo-title{font-family:var(--mono);font-size:clamp(24px,6vw,42px);font-weight:700;letter-spacing:-.02em;background:linear-gradient(135deg,#a89af7,#7c6ef0,#f05a5a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:glitch 4s infinite}
+.logo-sub{font-size:11px;color:var(--text-muted);letter-spacing:.2em;text-transform:uppercase;margin-top:3px}
+
+/* card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.2rem;margin-bottom:.9rem;position:relative;overflow:hidden}
+.card-scan::after{content:'';position:absolute;top:0;left:-100%;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(124,110,240,.06),transparent);animation:scanline 3s linear infinite;pointer-events:none}
+.label{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--text-muted);margin-bottom:.6rem;font-family:var(--mono)}
+
+/* inputs */
+.game-input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);font-family:var(--sans);font-size:15px;outline:none;transition:border-color .2s;margin-bottom:.7rem}
+.game-input:focus{border-color:var(--purple)}
+.game-input::placeholder{color:var(--text-dim)}
+.input-row{display:flex;gap:8px;margin-bottom:.7rem}
+.input-row .game-input{margin-bottom:0}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:14px;font-family:var(--sans);cursor:pointer;transition:all .2s;font-weight:500}
+.btn:hover{background:var(--surface2);border-color:var(--purple-dim)}
+.btn:active{transform:scale(.96)}
+.btn-primary{width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,#6055d4,#7c6ef0);border:none;color:#fff;font-size:15px;font-weight:700;font-family:var(--sans);cursor:pointer;transition:all .2s;letter-spacing:.02em;margin-bottom:.5rem}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(124,110,240,.4)}
+.btn-primary:active{transform:translateY(0) scale(.97)}
+.btn-danger{background:linear-gradient(135deg,#7c1f1f,#c0392b)!important;border:none}
+.btn-green{background:linear-gradient(135deg,#1a5c30,#27ae60)!important;border:none}
+.btn-yellow{background:linear-gradient(135deg,#5c4000,#c9920a)!important;border:none}
+.btn-row{display:flex;gap:8px}
+.btn-row>*{flex:1}
+
+/* avatar picker */
+.avatar-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:.8rem}
+.av-btn{padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:20px;cursor:pointer;text-align:center;transition:all .15s}
+.av-btn:hover,.av-btn.selected{border-color:var(--purple);background:rgba(124,110,240,.15);transform:scale(1.1)}
+
+/* topics */
+.topics-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:7px;margin-bottom:.8rem}
+.topic-pill{padding:9px 6px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text-muted);font-size:12px;cursor:pointer;text-align:center;transition:all .2s;position:relative}
+.topic-pill:hover{border-color:var(--purple-dim);color:var(--text)}
+.topic-pill.selected{border-color:var(--purple);color:var(--purple-light);background:rgba(124,110,240,.12);box-shadow:0 0 12px rgba(124,110,240,.2)}
+.topic-pill.selected::before{content:'✓';position:absolute;top:3px;right:5px;font-size:9px;color:var(--purple-light)}
+.topic-pill .icon{font-size:18px;display:block;margin-bottom:3px}
+
+/* round/timer pills */
+.pill-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.5rem}
+.opt-pill{padding:6px 12px;border:1px solid var(--border);border-radius:100px;background:var(--surface2);color:var(--text-muted);font-size:12px;cursor:pointer;transition:all .2s;font-family:var(--mono)}
+.opt-pill:hover{border-color:var(--purple-dim);color:var(--text)}
+.opt-pill.selected{border-color:var(--purple);color:var(--purple-light);background:rgba(124,110,240,.1)}
+.opt-pill.timer-sel.selected{border-color:var(--green);color:var(--green);background:rgba(74,222,128,.08)}
+
+/* room code */
+.room-code-big{font-family:var(--mono);font-size:36px;font-weight:700;letter-spacing:.12em;color:var(--purple-light);text-align:center;padding:1rem;background:rgba(124,110,240,.08);border-radius:12px;border:1px solid var(--purple-dim);margin-bottom:.7rem;cursor:pointer;transition:all .2s}
+.room-code-big:hover{background:rgba(124,110,240,.15)}
+.code-hint{text-align:center;font-size:12px;color:var(--text-muted);margin-bottom:.9rem;font-family:var(--mono)}
+
+/* player list */
+.player-list{display:flex;flex-direction:column;gap:7px;margin-bottom:.8rem}
+.player-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;animation:slideDown .25s ease both}
+.player-row.host-row{border-color:var(--purple-dim)}
+.p-avatar{font-size:22px;width:34px;text-align:center}
+.p-name{flex:1;font-size:14px;font-weight:500}
+.p-badge{font-size:10px;padding:2px 8px;border-radius:100px;background:var(--purple-dim);color:var(--purple-light);font-family:var(--mono)}
+.p-dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.p-dot.off{background:var(--red)}
+
+/* role card */
+.role-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:2rem 1.2rem;text-align:center;position:relative;overflow:hidden;margin-bottom:.9rem}
+.role-card.crew{border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.03)}
+.role-card.imp{border-color:rgba(240,90,90,.4);background:rgba(240,90,90,.04)}
+.role-emoji{font-size:60px;display:block;margin-bottom:.7rem;animation:floatY 2s ease-in-out infinite}
+.role-badge{display:inline-block;padding:5px 18px;border-radius:20px;font-size:13px;font-weight:700;font-family:var(--mono);letter-spacing:.05em;margin-bottom:.75rem}
+.crew-badge{background:rgba(74,222,128,.12);color:var(--green);border:1px solid rgba(74,222,128,.3)}
+.imp-badge{background:rgba(240,90,90,.12);color:var(--red);border:1px solid rgba(240,90,90,.3)}
+.role-word{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--purple-light);padding:10px 20px;background:rgba(124,110,240,.1);border-radius:10px;border:1px solid var(--purple-dim);margin:.7rem 0;display:inline-block;animation:glitch 5s infinite}
+.imp-word{color:var(--red)!important;background:rgba(240,90,90,.08)!important;border-color:var(--red-dim)!important}
+.rings{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center}
+.ring{position:absolute;width:90px;height:90px;border-radius:50%;border:1px solid rgba(240,90,90,.4);animation:ripple 2s ease-out infinite}
+.ring:nth-child(2){animation-delay:.6s}.ring:nth-child(3){animation-delay:1.2s}
+.role-desc{font-size:13px;color:var(--text-muted);line-height:1.6}
+
+/* discussion */
+.topic-banner{text-align:center;padding:.7rem 1rem;background:rgba(124,110,240,.08);border:1px solid var(--purple-dim);border-radius:12px;font-family:var(--mono);color:var(--purple-light);font-size:13px;margin-bottom:.9rem}
+.timer-wrap{text-align:center;margin-bottom:.9rem}
+.timer-circle{position:relative;width:130px;height:130px;margin:0 auto .8rem}
+.timer-svg{transform:rotate(-90deg)}
+.timer-track{fill:none;stroke:var(--surface2);stroke-width:8}
+.timer-fill{fill:none;stroke:var(--purple);stroke-width:8;stroke-linecap:round;stroke-dasharray:377;stroke-dashoffset:0;transition:stroke-dashoffset .9s linear,stroke .5s}
+.timer-fill.warn{stroke:var(--red)}
+.timer-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.timer-num{font-family:var(--mono);font-size:36px;font-weight:700}
+.timer-lbl{font-size:10px;color:var(--text-muted);letter-spacing:.1em}
+.timer-box{padding:1.2rem;background:var(--surface);border:1px solid var(--border);border-radius:16px;margin-bottom:.9rem;transition:box-shadow .4s}
+.timer-box.warn{animation:timerWarn 1s ease-in-out infinite}
+.tips-box{font-size:13px;color:var(--text-muted);line-height:1.7;padding:1rem;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:.9rem}
+.round-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:100px;background:var(--surface2);border:1px solid var(--border);font-size:11px;color:var(--text-muted);font-family:var(--mono);margin-bottom:.8rem}
+.waiting-lbl{text-align:center;font-size:13px;color:var(--text-muted);padding:.6rem;font-family:var(--mono)}
+
+/* voting */
+.vote-list{display:flex;flex-direction:column;gap:8px;margin-bottom:.9rem}
+.vote-row{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all .2s}
+.vote-row:hover:not(.disabled){border-color:var(--red);background:rgba(240,90,90,.05);transform:translateX(2px)}
+.vote-row.selected{border-color:var(--red);background:rgba(240,90,90,.1)}
+.vote-row.disabled{opacity:.45;cursor:default}
+.v-avatar{font-size:20px;width:30px;text-align:center}
+.v-name{flex:1;font-size:14px;font-weight:500}
+.v-votes{font-family:var(--mono);font-size:12px;color:var(--text-muted)}
+.v-check{font-size:16px;opacity:0;transition:opacity .2s}
+.vote-row.selected .v-check{opacity:1;color:var(--red)}
+.vote-status{text-align:center;font-size:12px;color:var(--text-muted);margin-bottom:.7rem;font-family:var(--mono)}
+.voted-badge{display:inline-block;padding:3px 10px;border-radius:100px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);color:var(--green);font-size:11px;font-family:var(--mono)}
+
+/* verdict */
+.verdict-box{text-align:center;padding:1.8rem;border-radius:18px;margin-bottom:.9rem;animation:popIn .4s ease}
+.verdict-box.crew-win{background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.3)}
+.verdict-box.imp-win{background:rgba(240,90,90,.06);border:1px solid rgba(240,90,90,.3)}
+.verdict-emoji{font-size:60px;display:block;margin-bottom:.6rem;animation:floatY 2s infinite}
+.verdict-title{font-size:24px;font-weight:700;margin-bottom:.4rem}
+.verdict-desc{font-size:13px;color:var(--text-muted);line-height:1.5}
+.word-reveal{text-align:center;padding:.9rem;background:rgba(124,110,240,.08);border:1px solid var(--purple-dim);border-radius:12px;font-family:var(--mono);margin-bottom:.9rem}
+.the-word{font-size:26px;font-weight:700;color:var(--purple-light);margin-top:4px}
+
+/* scoreboard */
+.score-list{display:flex;flex-direction:column;gap:8px;margin-bottom:.9rem}
+.score-row{display:flex;align-items:center;gap:9px;padding:11px 13px;background:var(--surface);border:1px solid var(--border);border-radius:12px;animation:slideDown .3s ease both}
+.s-rank{font-family:var(--mono);font-size:16px;font-weight:700;min-width:24px;color:var(--text-muted)}
+.s-rank.gold{color:#f5c842}.s-rank.silver{color:#aaa}.s-rank.bronze{color:#cd7f32}
+.s-name{flex:1}.s-pts{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--purple-light)}
+.summary-row{display:flex;gap:8px;margin-bottom:.9rem}
+.sum-box{flex:1;text-align:center;padding:.8rem;background:var(--surface);border:1px solid var(--border);border-radius:12px}
+.sum-val{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--purple-light)}
+.sum-key{font-size:10px;color:var(--text-muted);margin-top:2px}
+
+/* music btn */
+.music-btn{position:fixed;top:12px;right:12px;z-index:100;width:36px;height:36px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.music-btn:hover{border-color:var(--purple);color:var(--purple-light)}
+.music-btn.on{border-color:var(--purple);color:var(--purple-light);box-shadow:0 0 10px rgba(124,110,240,.3)}
+
+/* conn indicator */
+.conn-dot{position:fixed;top:14px;left:12px;display:flex;align-items:center;gap:5px;font-size:11px;font-family:var(--mono);color:var(--text-muted);z-index:100}
+.cdot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.cdot.off{background:var(--red);animation:pulse 1s infinite}
+
+/* toast */
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);border:1px solid var(--purple);border-radius:10px;padding:9px 18px;font-size:12px;color:var(--purple-light);font-family:var(--mono);transition:transform .3s;z-index:999;white-space:nowrap;max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* error screen */
+.error-box{text-align:center;padding:2rem;background:rgba(240,90,90,.06);border:1px solid rgba(240,90,90,.3);border-radius:16px;margin-bottom:1rem}
+.error-box h2{color:var(--red);font-size:20px;margin-bottom:.5rem}
+.error-box p{font-size:13px;color:var(--text-muted)}
+
+/* confetti */
+.confetti-piece{position:fixed;width:9px;height:9px;top:-10px;border-radius:2px;animation:confettiFall linear forwards;pointer-events:none;z-index:500}
+
+@media(max-width:400px){.avatar-grid{grid-template-columns:repeat(7,1fr)}.topics-grid{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<button class="music-btn" id="music-btn" onclick="toggleMusic()">🎵</button>
+<div class="conn-dot"><div class="cdot" id="cdot"></div><span id="conn-lbl">connecting</span></div>
+
+<div class="app">
+
+<!-- HOME -->
+<div id="s-home" class="screen active">
+  <div class="logo">
+    <span class="logo-icon">🕵️</span>
+    <div class="logo-title">IMPOSTOR</div>
+    <div class="logo-sub">multiplayer · real-time</div>
+  </div>
+  <div class="card">
+    <div class="label">your name</div>
+    <input class="game-input" id="home-name" placeholder="Enter your name…" maxlength="20"/>
+    <div class="label">pick your avatar</div>
+    <div class="avatar-grid" id="avatar-grid"></div>
+  </div>
+  <button class="btn-primary" onclick="goCreate()">🏠 create a room</button>
+  <div style="text-align:center;font-size:13px;color:var(--text-muted);margin:.5rem 0">— or —</div>
+  <div class="input-row">
+    <input class="game-input" id="join-code" placeholder="Room code (e.g. XKPQ2)" maxlength="5" style="text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono)"/>
+    <button class="btn" onclick="goJoin()">Join →</button>
+  </div>
+</div>
+
+<!-- LOBBY (host) -->
+<div id="s-lobby" class="screen">
+  <div class="logo" style="margin-bottom:1rem">
+    <span class="logo-icon" style="font-size:30px;margin-bottom:0">🕵️</span>
+    <div class="logo-title" style="font-size:24px">IMPOSTOR</div>
+  </div>
+  <div class="label" style="text-align:center">share this code with friends</div>
+  <div class="room-code-big" id="room-code-disp" onclick="copyCode()">—</div>
+  <div class="code-hint">tap to copy · <span id="player-count-lbl">1 player</span></div>
+
+  <div class="card">
+    <div class="label">players</div>
+    <div class="player-list" id="lobby-player-list"></div>
+  </div>
+
+  <div class="card card-scan" id="host-settings">
+    <div class="label">topic</div>
+    <div class="topics-grid" id="topic-grid"></div>
+    <div class="label">rounds</div>
+    <div class="pill-row" id="rounds-pills"></div>
+    <div class="label" style="margin-top:.6rem">discussion timer</div>
+    <div class="pill-row" id="timer-pills"></div>
+  </div>
+
+  <button class="btn-primary btn-green" id="start-btn" onclick="sendStartGame()">🚀 start game</button>
+  <div id="start-hint" style="text-align:center;font-size:12px;color:var(--text-muted);font-family:var(--mono)">waiting for at least 3 players…</div>
+</div>
+
+<!-- LOBBY (guest) -->
+<div id="s-lobby-guest" class="screen">
+  <div class="logo" style="margin-bottom:1rem">
+    <span class="logo-icon" style="font-size:30px;margin-bottom:0">🕵️</span>
+    <div class="logo-title" style="font-size:24px">IMPOSTOR</div>
+  </div>
+  <div class="room-code-big" id="guest-code-disp" onclick="copyCode()">—</div>
+  <div class="code-hint">waiting for host to start…</div>
+  <div class="card">
+    <div class="label">players in room</div>
+    <div class="player-list" id="guest-player-list"></div>
+  </div>
+  <div class="card" id="guest-settings-view" style="font-size:13px;color:var(--text-muted)">
+    <div class="label">game settings</div>
+    <div id="guest-settings-text"></div>
+  </div>
+</div>
+
+<!-- ROLE -->
+<div id="s-role" class="screen">
+  <div class="logo" style="margin-bottom:.8rem">
+    <span class="logo-icon" style="font-size:28px;margin-bottom:0">🕵️</span>
+    <div class="logo-title" style="font-size:22px">IMPOSTOR</div>
+  </div>
+  <div style="text-align:center;margin-bottom:.7rem"><div class="round-badge" id="role-round">round 1 of 3</div></div>
+  <div class="role-card" id="role-card"></div>
+  <div class="waiting-lbl" id="role-waiting">⏳ waiting for everyone to be ready…</div>
+</div>
+
+<!-- DISCUSSION -->
+<div id="s-discussion" class="screen">
+  <div class="logo" style="margin-bottom:.8rem">
+    <span class="logo-icon" style="font-size:26px;margin-bottom:0">🕵️</span>
+    <div class="logo-title" style="font-size:20px">IMPOSTOR</div>
+  </div>
+  <div style="text-align:center;margin-bottom:.7rem"><div class="round-badge" id="disc-round">round 1 of 3</div></div>
+  <div class="topic-banner" id="disc-topic-banner">topic: —</div>
+  <div class="timer-box" id="timer-box">
+    <div class="timer-circle">
+      <svg class="timer-svg" width="130" height="130" viewBox="0 0 130 130">
+        <circle class="timer-track" cx="65" cy="65" r="60"/>
+        <circle class="timer-fill" id="t-fill" cx="65" cy="65" r="60"/>
+      </svg>
+      <div class="timer-inner">
+        <span class="timer-num" id="t-num">—</span>
+        <span class="timer-lbl">seconds</span>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:13px;color:var(--text-muted);margin-bottom:.6rem">Discuss! Find the impostor!</p>
+    <div class="btn-row" id="host-timer-btns" style="display:none">
+      <button class="btn" id="pause-btn" onclick="sendPause()">⏸ pause</button>
+      <button class="btn" onclick="sendSkip()">skip →</button>
+    </div>
+  </div>
+  <div class="tips-box">
+    <strong style="color:var(--text)">💡 How to play this round</strong><br/>
+    • Take turns describing the word <em>without saying it</em><br/>
+    • Ask each other questions about it<br/>
+    • Impostors: give vague but believable clues<br/>
+    • When time's up — vote!
+  </div>
+  <div class="card">
+    <div class="label">players</div>
+    <div class="player-list" id="disc-player-list"></div>
+  </div>
+</div>
+
+<!-- VOTING -->
+<div id="s-voting" class="screen">
+  <div class="logo" style="margin-bottom:.8rem">
+    <span class="logo-icon" style="font-size:26px;margin-bottom:0">🕵️</span>
+    <div class="logo-title" style="font-size:20px">IMPOSTOR</div>
+  </div>
+  <div style="text-align:center;margin-bottom:.7rem"><div class="round-badge" id="vote-round">round 1 of 3</div></div>
+  <h2 style="text-align:center;font-size:18px;font-weight:700;margin-bottom:.4rem">🗳️ Vote out the Impostor!</h2>
+  <div class="vote-status" id="vote-status">0 / 0 voted</div>
+  <div class="vote-list" id="vote-list"></div>
+  <button class="btn" style="width:100%;margin-bottom:.7rem" onclick="castVote(null)">🤷 skip (no one)</button>
+  <div id="voted-msg" style="display:none;text-align:center"><span class="voted-badge">✅ vote cast — waiting for others…</span></div>
+</div>
+
+<!-- VERDICT -->
+<div id="s-verdict" class="screen">
+  <div class="logo" style="margin-bottom:.8rem">
+    <span class="logo-icon" style="font-size:26px;margin-bottom:0">🕵️</span>
+    <div class="logo-title" style="font-size:20px">IMPOSTOR</div>
+  </div>
+  <div class="verdict-box" id="verdict-box"></div>
+  <div class="word-reveal">
+    <div style="font-size:11px;color:var(--text-muted);font-family:var(--mono)">THE WORD WAS</div>
+    <div class="the-word" id="verd-word">—</div>
+  </div>
+  <div id="host-verdict-btns" style="display:none">
+    <button class="btn-primary" id="next-round-btn" onclick="sendNextRound()">⚔️ next round →</button>
+    <button class="btn-primary btn-yellow" id="end-game-btn" onclick="sendEndGame()" style="display:none">🏆 see scoreboard →</button>
+  </div>
+  <div id="guest-verdict-msg" class="waiting-lbl">⏳ waiting for host…</div>
+</div>
+
+<!-- SCOREBOARD -->
+<div id="s-scoreboard" class="screen">
+  <div class="logo" style="margin-bottom:.8rem">
+    <span class="logo-icon" style="font-size:28px;margin-bottom:0">🏆</span>
+    <div class="logo-title" style="font-size:22px">SCOREBOARD</div>
+  </div>
+  <div class="summary-row">
+    <div class="sum-box"><div class="sum-val" id="sb-players">—</div><div class="sum-key">players</div></div>
+    <div class="sum-box"><div class="sum-val" id="sb-rounds">—</div><div class="sum-key">rounds</div></div>
+    <div class="sum-box"><div class="sum-val" id="sb-crew">—</div><div class="sum-key">crew wins</div></div>
+    <div class="sum-box"><div class="sum-val" id="sb-imp">—</div><div class="sum-key">imp wins</div></div>
+  </div>
+  <div class="score-list" id="score-list"></div>
+  <div id="host-sb-btns" style="display:none">
+    <button class="btn-primary btn-green" onclick="sendRestart()">🔄 play again</button>
+    <button class="btn" onclick="leaveGame()" style="width:100%">↩ leave room</button>
+  </div>
+  <div id="guest-sb-btns" style="display:none">
+    <button class="btn" onclick="leaveGame()" style="width:100%">↩ leave</button>
+  </div>
+</div>
+
+<!-- ERROR -->
+<div id="s-error" class="screen">
+  <div class="logo" style="margin-bottom:1rem">
+    <span class="logo-icon" style="font-size:36px;margin-bottom:0">😵</span>
+    <div class="logo-title" style="font-size:22px">OOPS</div>
+  </div>
+  <div class="error-box"><h2>Something went wrong</h2><p id="err-msg">—</p></div>
+  <button class="btn-primary" onclick="goHome()">← go home</button>
+</div>
+
+</div><!-- /app -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const AVATARS = ['🧑','👩','🧔','👱','🧕','👨','🙎','💁','🧛','🤖','👾','🦊','🐺','🦁','🐸','🐧'];
+const ROUND_OPTS = [1,2,3,5];
+const TIMER_OPTS = [{l:'30s',v:30},{l:'1 min',v:60},{l:'2 min',v:120},{l:'3 min',v:180},{l:'off',v:0}];
+
+let ws = null, reconnectTimer = null;
+let myId = null, myRoomCode = null, isHost = false;
+let myAvatar = '🧑', selectedAvatar = 0;
+let gameState = null;
+let myRole = null, myWord = null, myTopic = null;
+let myVote = null, hasVoted = false;
+let localTimerLeft = 0, localTimerTotal = 1, localTimerInterval = null, timerPaused = false;
+let topics = [];
+let hostTopic = 'animals', hostRounds = 3, hostTimer = 60;
+let musicPlaying = false, musicNodes = null;
+
+// ─── WEBSOCKET ───────────────────────────────────────────────────────────────
+function connect(onOpen) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}`);
+  document.getElementById('cdot').className = 'cdot off';
+  document.getElementById('conn-lbl').textContent = 'connecting';
+
+  ws.onopen = () => {
+    document.getElementById('cdot').className = 'cdot';
+    document.getElementById('conn-lbl').textContent = 'connected';
+    if (onOpen) onOpen();
+  };
+
+  ws.onclose = () => {
+    document.getElementById('cdot').className = 'cdot off';
+    document.getElementById('conn-lbl').textContent = 'disconnected';
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => connect(() => {
+      // rejoin if we had a room
+      if (myRoomCode && myId) showToast('reconnected!');
+    }), 2000);
+  };
+
+  ws.onerror = () => {};
+
+  ws.onmessage = e => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+    handleMsg(msg);
+  };
+}
+
+function send(obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
+
+// ─── MESSAGE HANDLER ─────────────────────────────────────────────────────────
+function handleMsg(msg) {
+  switch (msg.type) {
+    case 'joined':
+      myId = msg.playerId;
+      myRoomCode = msg.roomCode;
+      if (msg.topics) topics = msg.topics;
+      gameState = msg.state;
+      isHost = gameState.host === myId;
+      if (isHost) { renderLobbyHost(); go('s-lobby'); }
+      else { renderLobbyGuest(); go('s-lobby-guest'); }
+      break;
+
+    case 'playerJoined':
+    case 'settingsChanged':
+    case 'playerLeft':
+    case 'voted':
+      gameState = msg.state;
+      refreshCurrentScreen(msg);
+      break;
+
+    case 'roleAssigned':
+      gameState = msg.state;
+      myRole = msg.role;
+      myWord = msg.word;
+      myTopic = msg.topic;
+      myVote = null; hasVoted = false;
+      renderRoleCard();
+      go('s-role');
+      break;
+
+    case 'phase':
+      gameState = msg.state;
+      if (msg.phase === 'discussion') {
+        go('s-discussion');
+        renderDiscussion();
+        if (gameState.timerDuration > 0) startLocalTimer(gameState.timerDuration);
+      } else if (msg.phase === 'voting') {
+        stopLocalTimer();
+        myVote = null; hasVoted = false;
+        go('s-voting');
+        renderVoting();
+      } else if (msg.phase === 'verdict') {
+        if (msg.theWord) myWord = msg.theWord;
+        go('s-verdict');
+        renderVerdict(msg.state.verdict, msg.theWord || msg.state.theWord);
+      } else if (msg.phase === 'scoreboard') {
+        go('s-scoreboard');
+        renderScoreboard(msg.state, msg.theWord || msg.state.theWord);
+        spawnConfetti();
+        SFX.results();
+      } else if (msg.phase === 'lobby') {
+        myRole = null; myWord = null; hasVoted = false;
+        if (isHost) { renderLobbyHost(); go('s-lobby'); }
+        else { renderLobbyGuest(); go('s-lobby-guest'); }
+      }
+      break;
+
+    case 'timer':
+      localTimerLeft = msg.timerLeft;
+      updateTimerUI(localTimerLeft, localTimerTotal);
+      break;
+
+    case 'timerPaused':
+      timerPaused = msg.paused;
+      document.getElementById('pause-btn').textContent = timerPaused ? '▶ resume' : '⏸ pause';
+      break;
+
+    case 'error':
+      showError(msg.msg);
+      break;
+  }
+}
+
+function refreshCurrentScreen(msg) {
+  const cur = document.querySelector('.screen.active');
+  if (!cur) return;
+  const id = cur.id;
+  if (id === 's-lobby') renderLobbyHost();
+  else if (id === 's-lobby-guest') renderLobbyGuest();
+  else if (id === 's-discussion') renderDiscussion();
+  else if (id === 's-voting') renderVoting();
+}
+
+// ─── HOME ────────────────────────────────────────────────────────────────────
+function initHome() {
+  const grid = document.getElementById('avatar-grid');
+  grid.innerHTML = AVATARS.map((a,i) => `<div class="av-btn${i===0?' selected':''}" onclick="pickAvatar(${i})">${a}</div>`).join('');
+}
+function pickAvatar(i) {
+  selectedAvatar = i; myAvatar = AVATARS[i]; SFX.click();
+  document.querySelectorAll('.av-btn').forEach((b,j) => b.classList.toggle('selected', j===i));
+}
+function getName() {
+  return document.getElementById('home-name').value.trim() || 'Player';
+}
+
+function goCreate() {
+  SFX.start();
+  connect(() => send({ type:'create', name: getName(), avatar: myAvatar }));
+}
+function goJoin() {
+  const code = document.getElementById('join-code').value.trim().toUpperCase();
+  if (!code) { showToast('enter a room code'); return; }
+  SFX.click();
+  connect(() => send({ type:'join', code, name: getName(), avatar: myAvatar }));
+}
+
+// ─── LOBBY HOST ──────────────────────────────────────────────────────────────
+function renderLobbyHost() {
+  document.getElementById('room-code-disp').textContent = gameState.code;
+  const players = gameState.players;
+  document.getElementById('player-count-lbl').textContent = `${players.length} player${players.length!==1?'s':''}`;
+  document.getElementById('lobby-player-list').innerHTML = players.map((p,i) =>
+    `<div class="player-row${p.id===gameState.host?' host-row':''}">
+      <div class="p-avatar">${p.avatar}</div>
+      <div class="p-name">${p.name}</div>
+      ${p.id===gameState.host?'<span class="p-badge">host</span>':''}
+      <div class="p-dot${p.connected?'':' off'}"></div>
+    </div>`).join('');
+
+  // render topic grid
+  document.getElementById('topic-grid').innerHTML = topics.map(t =>
+    `<div class="topic-pill${gameState.topic===t.id?' selected':''}" onclick="setTopic('${t.id}')">
+      <span class="icon">${t.icon}</span>${t.label}
+    </div>`).join('');
+
+  document.getElementById('rounds-pills').innerHTML = ROUND_OPTS.map(r =>
+    `<div class="opt-pill${gameState.totalRounds===r?' selected':''}" onclick="setRounds(${r})">${r} round${r>1?'s':''}</div>`).join('');
+
+  document.getElementById('timer-pills').innerHTML = TIMER_OPTS.map(t =>
+    `<div class="opt-pill timer-sel${gameState.timerDuration===t.v?' selected':''}" onclick="setTimerDur(${t.v})">${t.l}</div>`).join('');
+
+  const canStart = players.length >= 3;
+  document.getElementById('start-btn').disabled = !canStart;
+  document.getElementById('start-hint').style.display = canStart ? 'none' : 'block';
+}
+
+function setTopic(t) { SFX.select(); send({ type:'settings', topic:t }); }
+function setRounds(r) { SFX.click(); send({ type:'settings', totalRounds:r }); }
+function setTimerDur(v) { SFX.click(); send({ type:'settings', timerDuration:v }); }
+function sendStartGame() { SFX.start(); send({ type:'startGame' }); }
+
+// ─── LOBBY GUEST ─────────────────────────────────────────────────────────────
+function renderLobbyGuest() {
+  document.getElementById('guest-code-disp').textContent = gameState.code;
+  document.getElementById('guest-player-list').innerHTML = gameState.players.map(p =>
+    `<div class="player-row${p.id===gameState.host?' host-row':''}">
+      <div class="p-avatar">${p.avatar}</div>
+      <div class="p-name">${p.name}</div>
+      ${p.id===gameState.host?'<span class="p-badge">host</span>':''}
+      <div class="p-dot${p.connected?'':' off'}"></div>
+    </div>`).join('');
+  const t = topics.find(x=>x.id===gameState.topic);
+  const timerLabel = TIMER_OPTS.find(x=>x.v===gameState.timerDuration);
+  document.getElementById('guest-settings-text').innerHTML =
+    `Topic: <strong style="color:var(--purple-light)">${t?t.icon+' '+t.label:'—'}</strong><br/>
+     Rounds: <strong style="color:var(--purple-light)">${gameState.totalRounds}</strong><br/>
+     Timer: <strong style="color:var(--green)">${timerLabel?timerLabel.l:'—'}</strong>`;
+}
+
+// ─── ROLE ────────────────────────────────────────────────────────────────────
+function renderRoleCard() {
+  document.getElementById('role-round').textContent = `round ${gameState.currentRound} of ${gameState.totalRounds}`;
+  const card = document.getElementById('role-card');
+  const isImp = myRole === 'impostor';
+  if (isImp) {
+    SFX.impostor();
+    card.className = 'role-card imp';
+    card.innerHTML = `
+      <div class="rings"><div class="ring"></div><div class="ring"></div><div class="ring"></div></div>
+      <div style="animation:fadeIn .4s ease">
+        <span class="role-emoji">😈</span>
+        <div class="role-badge imp-badge">☠ IMPOSTOR</div>
+        <div class="role-word imp-word">???</div>
+        <div class="role-desc">You have no word.<br/>Listen carefully — blend in and don't get caught!</div>
+      </div>`;
+  } else {
+    SFX.crewmate();
+    card.className = 'role-card crew';
+    card.innerHTML = `
+      <div style="animation:fadeIn .4s ease">
+        <span class="role-emoji">😇</span>
+        <div class="role-badge crew-badge">✓ CREWMATE</div>
+        <div class="role-word">${myWord}</div>
+        <div class="role-desc">Memorize your word!<br/>Describe it without saying it — find the impostor!</div>
+      </div>`;
+  }
+}
+
+// ─── DISCUSSION ──────────────────────────────────────────────────────────────
+function renderDiscussion() {
+  const t = topics.find(x=>x.id===gameState.topic);
+  document.getElementById('disc-round').textContent = `round ${gameState.currentRound} of ${gameState.totalRounds}`;
+  document.getElementById('disc-topic-banner').textContent = `topic: ${t?t.icon+' '+t.label:gameState.topic}`;
+  document.getElementById('disc-player-list').innerHTML = gameState.players.map(p =>
+    `<div class="player-row"><div class="p-avatar">${p.avatar}</div><div class="p-name">${p.name}</div><div class="p-dot${p.connected?'':' off'}"></div></div>`).join('');
+  document.getElementById('host-timer-btns').style.display = isHost ? 'flex' : 'none';
+  if (!gameState.timerDuration) {
+    document.getElementById('t-num').textContent = '∞';
+  }
+}
+
+function startLocalTimer(secs) {
+  stopLocalTimer();
+  localTimerLeft = secs; localTimerTotal = secs; timerPaused = false;
+  updateTimerUI(localTimerLeft, localTimerTotal);
+  localTimerInterval = setInterval(() => {
+    if (timerPaused) return;
+    localTimerLeft--;
+    updateTimerUI(localTimerLeft, localTimerTotal);
+    if (localTimerLeft <= 10 && localTimerLeft > 0) SFX.tick();
+    if (localTimerLeft <= 0) { stopLocalTimer(); SFX.alarm(); }
+  }, 1000);
+}
+function stopLocalTimer() { clearInterval(localTimerInterval); localTimerInterval = null; }
+function updateTimerUI(left, total) {
+  document.getElementById('t-num').textContent = Math.max(0, left);
+  const circ = 377;
+  const fill = document.getElementById('t-fill');
+  fill.style.strokeDashoffset = circ * (1 - Math.max(0, left) / total);
+  const warn = left <= 10 && left > 0;
+  fill.classList.toggle('warn', warn);
+  document.getElementById('timer-box').classList.toggle('warn', warn);
+}
+function sendPause() { send({ type:'pauseTimer' }); SFX.click(); }
+function sendSkip() { send({ type:'skipTimer' }); SFX.click(); }
+
+// ─── VOTING ──────────────────────────────────────────────────────────────────
+function renderVoting() {
+  const voted = gameState.players.filter(p=>p.voted).length;
+  const total = gameState.players.length;
+  document.getElementById('vote-round').textContent = `round ${gameState.currentRound} of ${gameState.totalRounds}`;
+  document.getElementById('vote-status').textContent = `${voted} / ${total} voted`;
+  document.getElementById('voted-msg').style.display = hasVoted ? 'block' : 'none';
+
+  const me = gameState.players.find(p => p.id === myId);
+  document.getElementById('vote-list').innerHTML = gameState.players.map(p => {
+    const isSelf = p.id === myId;
+    const isVoted = myVote === p.id;
+    return `<div class="vote-row${isSelf?' disabled':''}${isVoted?' selected':''}" onclick="${isSelf||hasVoted?'':' castVote("'+p.id+'")'}">
+      <div class="v-avatar">${p.avatar}</div>
+      <div class="v-name">${p.name}${isSelf?' (you)':''}</div>
+      <div class="v-votes">${p.voted?'voted':''}</div>
+      <span class="v-check">☠</span>
+    </div>`;
+  }).join('');
+}
+
+function castVote(targetId) {
+  if (hasVoted) return;
+  hasVoted = true; myVote = targetId;
+  SFX.select();
+  send({ type:'vote', targetId });
+  renderVoting();
+}
+
+// ─── VERDICT ─────────────────────────────────────────────────────────────────
+function renderVerdict(verdict, word) {
+  if (!verdict) return;
+  document.getElementById('verd-word').textContent = word || '—';
+  const box = document.getElementById('verdict-box');
+  const crewWon = verdict.result === 'crew_win';
+  box.className = 'verdict-box ' + (crewWon ? 'crew-win' : 'imp-win');
+  const elim = verdict.eliminatedId ? gameState.players.find(p=>p.id===verdict.eliminatedId) : null;
+  if (crewWon) {
+    SFX.results(); spawnConfetti();
+    box.innerHTML = `<span class="verdict-emoji">🎉</span><div class="verdict-title">Crewmates Win!</div>
+      <div class="verdict-desc">The impostor has been caught!${elim?'<br/><span style="color:var(--red);font-family:var(--mono)">☠ '+elim.name+' was the impostor</span>':''}</div>`;
+  } else {
+    SFX.impostor();
+    box.innerHTML = `<span class="verdict-emoji">😈</span><div class="verdict-title">Impostor Wins!</div>
+      <div class="verdict-desc">The crew voted wrong. Impostors escape!${elim?'<br/><span style="color:var(--text-muted);font-family:var(--mono)">❌ '+elim.name+' was innocent</span>':''}</div>`;
+  }
+
+  const isLast = gameState.currentRound >= gameState.totalRounds;
+  document.getElementById('host-verdict-btns').style.display = isHost ? 'block' : 'none';
+  document.getElementById('guest-verdict-msg').style.display = isHost ? 'none' : 'block';
+  if (isHost) {
+    document.getElementById('next-round-btn').style.display = isLast ? 'none' : 'block';
+    document.getElementById('end-game-btn').style.display = isLast ? 'block' : 'none';
+  }
+}
+
+function sendNextRound() { SFX.start(); send({ type:'nextRound' }); }
+function sendEndGame() { send({ type:'endGame' }); }
+
+// ─── SCOREBOARD ──────────────────────────────────────────────────────────────
+function renderScoreboard(state, word) {
+  document.getElementById('sb-players').textContent = state.players.length;
+  document.getElementById('sb-rounds').textContent = state.totalRounds;
+  document.getElementById('sb-crew').textContent = state.crewWins;
+  document.getElementById('sb-imp').textContent = state.impWins;
+  const sorted = [...state.players].sort((a,b)=>b.score-a.score);
+  const medals = ['🥇','🥈','🥉'];
+  const rankCls = ['gold','silver','bronze'];
+  document.getElementById('score-list').innerHTML = sorted.map((p,i) =>
+    `<div class="score-row" style="animation-delay:${i*.07}s">
+      <span class="s-rank ${rankCls[i]||''}">${i<3?medals[i]:i+1}</span>
+      <div class="p-avatar">${p.avatar}</div>
+      <div class="s-name"><div style="font-weight:500">${p.name}</div><div style="font-size:11px;color:var(--text-muted);font-family:var(--mono)">${p.id===myId?'(you)':''}</div></div>
+      <span class="s-pts">${p.score}</span>
+    </div>`).join('');
+  document.getElementById('host-sb-btns').style.display = isHost ? 'block' : 'none';
+  document.getElementById('guest-sb-btns').style.display = isHost ? 'none' : 'block';
+}
+
+function sendRestart() { send({ type:'restartGame' }); SFX.click(); }
+function leaveGame() { myRoomCode = null; myId = null; isHost = false; go('s-home'); SFX.click(); }
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+function go(id) {
+  document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display='none'; });
+  const el = document.getElementById(id); el.style.display = 'block';
+  requestAnimationFrame(() => el.classList.add('active'));
+}
+function goHome() { go('s-home'); }
+function showError(msg) { document.getElementById('err-msg').textContent = msg; go('s-error'); }
+function showToast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
+function copyCode() {
+  const code = myRoomCode || gameState?.code;
+  if (!code) return;
+  navigator.clipboard.writeText(code).then(() => showToast('code copied! 📋')).catch(()=>showToast(code));
+  SFX.click();
+}
+function spawnConfetti() {
+  const colors=['#7c6ef0','#f05a5a','#4ade80','#f5c842','#a89af7','#fff'];
+  for(let i=0;i<50;i++){
+    const el=document.createElement('div'); el.className='confetti-piece';
+    el.style.cssText=`left:${Math.random()*100}vw;background:${colors[Math.floor(Math.random()*colors.length)]};width:${6+Math.random()*8}px;height:${6+Math.random()*8}px;border-radius:${Math.random()>.5?'50%':'2px'};animation-duration:${2+Math.random()*2}s;animation-delay:${Math.random()*1.2}s`;
+    document.body.appendChild(el); setTimeout(()=>el.remove(),4500);
+  }
+}
+
+// ─── AUDIO ───────────────────────────────────────────────────────────────────
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+function rAC(){ if(AC.state==='suspended') AC.resume(); }
+function playTone({freq=440,freq2,type='sine',duration=.15,volume=.25,delay=0}){
+  rAC(); const o=AC.createOscillator(),g=AC.createGain(); o.connect(g); g.connect(AC.destination);
+  o.type=type; const t=AC.currentTime+delay; o.frequency.setValueAtTime(freq,t);
+  if(freq2&&freq2!==freq) o.frequency.exponentialRampToValueAtTime(freq2,t+duration);
+  g.gain.setValueAtTime(volume,t); g.gain.exponentialRampToValueAtTime(.001,t+duration);
+  o.start(t); o.stop(t+duration+.02);
+}
+function playNoise(dur=.1,vol=.12,fq=800){
+  rAC(); const buf=AC.createBuffer(1,AC.sampleRate*dur,AC.sampleRate);
+  const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  const s=AC.createBufferSource(),g=AC.createGain(),f=AC.createBiquadFilter();
+  f.type='bandpass';f.frequency.value=fq;f.Q.value=1.5;
+  s.buffer=buf;s.connect(f);f.connect(g);g.connect(AC.destination);
+  g.gain.setValueAtTime(vol,AC.currentTime); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+dur);
+  s.start(); s.stop(AC.currentTime+dur+.02);
+}
+const SFX={
+  click(){ playTone({freq:600,freq2:720,type:'sine',duration:.07,volume:.14}); },
+  select(){ playTone({freq:440,type:'triangle',duration:.06,volume:.14}); playTone({freq:660,type:'triangle',duration:.1,volume:.14,delay:.07}); },
+  start(){ [200,300,450,600,800].forEach((f,i)=>playTone({freq:f,freq2:f*1.1,type:'sawtooth',duration:.12,volume:.11,delay:i*.09})); },
+  crewmate(){ [[523,0],[659,.12],[784,.24],[1047,.4]].forEach(([f,d])=>playTone({freq:f,type:'sine',duration:.2,volume:.18,delay:d})); },
+  impostor(){
+    playTone({freq:180,freq2:80,type:'sawtooth',duration:.5,volume:.22});
+    playTone({freq:220,freq2:100,type:'square',duration:.4,volume:.16,delay:.1});
+    playNoise(.3,.18); [1,2,3].forEach(i=>playTone({freq:60+i*10,type:'sine',duration:.6,volume:.09,delay:i*.05}));
+  },
+  results(){ [[262,0],[330,.1],[392,.2],[523,.35],[659,.5],[784,.65]].forEach(([f,d])=>playTone({freq:f,type:'triangle',duration:.22,volume:.16,delay:d})); },
+  tick(){ playTone({freq:1000,type:'sine',duration:.05,volume:.09}); },
+  alarm(){ playTone({freq:880,type:'square',duration:.14,volume:.18}); playTone({freq:660,type:'square',duration:.14,volume:.18,delay:.17}); playTone({freq:440,type:'square',duration:.28,volume:.18,delay:.34}); },
+};
+
+// ─── MUSIC ───────────────────────────────────────────────────────────────────
+function buildMusic(){
+  rAC();
+  const master=AC.createGain(); master.gain.value=.16; master.connect(AC.destination);
+  const bassF=[65.4,73.4,82.4,98,110,130.8];
+  const bassP=[0,0,2,2,1,1,3,3,4,4,3,3,2,2,0,0];
+  let bStep=0;
+  function bass(){ const o=AC.createOscillator(),g=AC.createGain(),f=AC.createBiquadFilter(); f.type='lowpass';f.frequency.value=280; o.type='sawtooth'; o.frequency.value=bassF[bassP[bStep++%bassP.length]]; o.connect(f);f.connect(g);g.connect(master); g.gain.setValueAtTime(.55,AC.currentTime); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.32); o.start();o.stop(AC.currentTime+.35); }
+  const melF=[261.6,293.7,329.6,392,440,523.3,587.3,659.3];
+  const melP=[0,2,4,5,4,2,0,1,3,5,6,5,3,1,2,4,6,7,6,4];
+  let mStep=0;
+  function mel(){ const o=AC.createOscillator(),g=AC.createGain(); o.type='triangle'; o.frequency.value=melF[melP[mStep++%melP.length]]; o.connect(g);g.connect(master); g.gain.setValueAtTime(.22,AC.currentTime); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.55); o.start();o.stop(AC.currentTime+.6); }
+  const padOscs=[130.8,164.8,196,246.9].map(f=>{ const o=AC.createOscillator(),g=AC.createGain(),fl=AC.createBiquadFilter(); fl.type='lowpass';fl.frequency.value=500; o.type='sine';o.frequency.value=f; o.connect(fl);fl.connect(g);g.connect(master); g.gain.value=.07; o.start(); return{o,g}; });
+  function kick(){ const o=AC.createOscillator(),g=AC.createGain(); o.type='sine'; o.frequency.setValueAtTime(150,AC.currentTime); o.frequency.exponentialRampToValueAtTime(40,AC.currentTime+.14); o.connect(g);g.connect(master); g.gain.setValueAtTime(.6,AC.currentTime); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.18); o.start();o.stop(AC.currentTime+.2); }
+  let beat=0;
+  const bI=setInterval(bass,480);
+  const mI=setInterval(mel,360);
+  const dI=setInterval(()=>{ if(beat%8===0||beat%8===4)kick(); if(beat%2===1)playNoise(.04,.05,8000); beat++; },240);
+  const lI=setInterval(()=>{ padOscs.forEach((p,i)=>{ p.g.gain.value=.03+Math.sin(Date.now()/3000+i)*.03; }); },60);
+  return{bI,mI,dI,lI,padOscs,master};
+}
+function stopMusic(n){
+  if(!n)return; clearInterval(n.bI);clearInterval(n.mI);clearInterval(n.dI);clearInterval(n.lI);
+  n.padOscs.forEach(p=>{try{p.o.stop();}catch(e){}});
+  try{n.master.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.5);}catch(e){}
+}
+function toggleMusic(){
+  rAC(); musicPlaying=!musicPlaying;
+  const btn=document.getElementById('music-btn');
+  if(musicPlaying){ musicNodes=buildMusic(); btn.textContent='🔊'; btn.classList.add('on'); showToast('🎵 music on'); }
+  else{ stopMusic(musicNodes); musicNodes=null; btn.textContent='🎵'; btn.classList.remove('on'); showToast('🔇 music off'); }
+}
+
+// ─── BOOT ────────────────────────────────────────────────────────────────────
+initHome();
+connect();
+</script>
+</body>
+</html>
