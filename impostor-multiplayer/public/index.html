@@ -649,13 +649,14 @@ function renderVoting(){
   document.getElementById('vote-list').innerHTML=gameState.players.map(p=>{
     const isSelf=p.id===myId;
     const isSelected=myVote===p.id;
-    return `<div class="vote-row${isSelf?' disabled':''}${isSelected?' selected':''}" onclick="${isSelf||hasVoted?'':' castVote("'+p.id+'")'}" >
-      <div class="v-avatar">${p.avatar}</div>
-      <div class="v-name">${p.name}${isSelf?' <span style="font-size:11px;color:var(--text-dim)">(you)</span>':''}</div>
-      <div class="v-votes">${p.voted?'✓ voted':''}</div>
-      <span class="v-check">☠</span>
-    </div>`;
-  }).join('');
+    return `
+<div class="vote-row${isSelf ? ' disabled' : ''}${isSelected ? ' selected' : ''}"
+     onclick="${isSelf || hasVoted ? '' : `castVote('${p.id}')`}">
+  <div class="v-avatar">${p.avatar}</div>
+  <div class="v-name">${p.name}${isSelf ? ' <span style="font-size:11px;color:var(--text-dim)">(you)</span>' : ''}</div>
+  <div class="v-votes">${p.voted ? '✓ voted' : ''}</div>
+  <span class="v-check">☠</span>
+</div>`;
 }
 
 function castVote(targetId){
