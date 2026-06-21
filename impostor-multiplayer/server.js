@@ -10,14 +10,13 @@ const wss = new WebSocketServer({ server });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ─── GAME DATA ───────────────────────────────────────────────────────────────
 const TOPICS = {
-  animals:    { icon:'🐾', words:['dog','cat','elephant','parrot','shark','penguin','giraffe','wolf','lion','dolphin','zebra','crocodile'] },
+  animals:    { icon:'🐾', words:['dog','cat','elephant','sheep','shark','penguin','giraffe','wolf','lion','dolphin','zebra','crocodile'] },
   fruits:     { icon:'🍉', words:['mango','apple','watermelon','grape','pineapple','banana','kiwi','papaya','durian','guava','lychee','dragonfruit'] },
   countries:  { icon:'🌍', words:['Japan','Brazil','Ethiopia','Canada','Australia','Egypt','Norway','Mexico','Nigeria','Thailand','Argentina','Sweden'] },
   sports:     { icon:'⚽', words:['soccer','tennis','swimming','boxing','basketball','cycling','rugby','golf','volleyball','archery','fencing','sumo'] },
-  movies:     { icon:'🎬', words:['Titanic','Inception','Parasite','Avatar','Joker','Dune','Interstellar','Frozen','Oppenheimer','Alien','Gladiator','Matrix'] },
-  foods:      { icon:'🍕', words:['pizza','sushi','tacos','pasta','burger','injera','ramen','croissant','baklava','jollof','biryani','pho'] },
+  movies:     { icon:'🎬', words:['Titanic','Zootopia','Minions','Avatar','Joker','Dune','Interstellar','Frozen','Spider-Man','Alien','Gladiator','Matrix'] },
+  foods:      { icon:'🍕', words:['pizza','sushi','tacos','pasta','burger','injera','ramen','Firfir','Enkulal','Ertb','biryani','Ktfo'] },
   jobs:       { icon:'💼', words:['teacher','doctor','pilot','chef','lawyer','engineer','farmer','musician','astronaut','spy','firefighter','surgeon'] },
   colors:     { icon:'🎨', words:['crimson','turquoise','violet','amber','ivory','navy','scarlet','olive','magenta','cobalt','teal','vermillion'] },
   vehicles:   { icon:'🚀', words:['motorcycle','submarine','helicopter','tractor','speedboat','tram','rocket','skateboard','zeppelin','hovercraft','gondola','snowmobile'] },
@@ -27,9 +26,8 @@ const TOPICS = {
   girls:      { icon:'👧', words:['Saron 😍','Bitaniya (mia)','Leah (Shele one)','Melkam (Ahh)','Emrachel 😘','Maleda 🤢','Amal 🍑','Awnan 🍒','FeVen 👩🏿','FeBen (KSI)'] },
 };
 
-// ─── ROOMS ───────────────────────────────────────────────────────────────────
-const rooms = {}; // roomCode -> room
-const clients = {}; // ws -> { roomCode, playerId }
+const rooms = {};
+const clients = new Map(); // ws -> { roomCode, playerId }
 
 function genCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -49,16 +47,20 @@ function shuffle(arr) {
 
 function impostorCount(n) { return n <= 4 ? 1 : n <= 8 ? 2 : 3; }
 
+function safeSend(ws, msg) {
+  try {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+  } catch(e) {}
+}
+
 function broadcast(room, msg, excludeId = null) {
   room.players.forEach(p => {
-    if (p.id !== excludeId && p.ws && p.ws.readyState === 1) {
-      p.ws.send(JSON.stringify(msg));
-    }
+    if (p.id !== excludeId) safeSend(p.ws, msg);
   });
 }
 
-function send(ws, msg) {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+function broadcastAll(room, msg) {
+  room.players.forEach(p => safeSend(p.ws, msg));
 }
 
 function roomPublicState(room) {
@@ -70,7 +72,6 @@ function roomPublicState(room) {
     totalRounds: room.totalRounds,
     currentRound: room.currentRound,
     timerDuration: room.timerDuration,
-    timerLeft: room.timerLeft,
     players: room.players.map(p => ({
       id: p.id,
       name: p.name,
@@ -78,41 +79,41 @@ function roomPublicState(room) {
       score: p.score,
       connected: p.connected,
       voted: p.voted,
-      eliminated: p.eliminated,
+      ready: p.readyForDiscussion || false,
     })),
     votes: room.phase === 'verdict' ? room.votes : {},
     crewWins: room.crewWins,
     impWins: room.impWins,
     verdict: room.verdict || null,
-    theWord: room.phase === 'verdict' || room.phase === 'scoreboard' ? room.theWord : undefined,
+    theWord: (room.phase === 'verdict' || room.phase === 'scoreboard') ? room.theWord : undefined,
   };
-}
-
-function startTimerTick(room) {
-  if (room.timerInterval) clearInterval(room.timerInterval);
-  if (!room.timerDuration) return;
-  room.timerLeft = room.timerDuration;
-  room.timerPaused = false;
-  room.timerInterval = setInterval(() => {
-    if (room.timerPaused) return;
-    room.timerLeft--;
-    broadcast(room, { type: 'timer', timerLeft: room.timerLeft });
-    if (room.timerLeft <= 0) {
-      clearInterval(room.timerInterval);
-      startVoting(room);
-    }
-  }, 1000);
 }
 
 function stopTimer(room) {
   if (room.timerInterval) { clearInterval(room.timerInterval); room.timerInterval = null; }
 }
 
+function startTimerTick(room) {
+  stopTimer(room);
+  if (!room.timerDuration) return;
+  room.timerLeft = room.timerDuration;
+  room.timerPaused = false;
+  room.timerInterval = setInterval(() => {
+    if (room.timerPaused) return;
+    room.timerLeft--;
+    broadcastAll(room, { type: 'timer', timerLeft: room.timerLeft });
+    if (room.timerLeft <= 0) {
+      stopTimer(room);
+      startVoting(room);
+    }
+  }, 1000);
+}
+
 function assignRoles(room) {
   const n = room.players.length;
   const numImp = impostorCount(n);
   const impIdxs = new Set(shuffle([...Array(n).keys()]).slice(0, numImp));
-  const topicData = TOPICS[room.topic];
+  const topicData = TOPICS[room.topic] || TOPICS['animals'];
   const word = topicData.words[Math.floor(Math.random() * topicData.words.length)];
   room.theWord = word;
   room.impostors = [];
@@ -120,7 +121,7 @@ function assignRoles(room) {
     p.isImpostor = impIdxs.has(i);
     p.role = p.isImpostor ? 'impostor' : 'crewmate';
     p.voted = false;
-    p.eliminated = false;
+    p.readyForDiscussion = false;
     if (p.isImpostor) room.impostors.push(p.id);
   });
 }
@@ -130,7 +131,7 @@ function startVoting(room) {
   room.phase = 'voting';
   room.votes = {};
   room.players.forEach(p => { p.voted = false; });
-  broadcast(room, { type: 'phase', phase: 'voting', state: roomPublicState(room) });
+  broadcastAll(room, { type: 'phase', phase: 'voting', state: roomPublicState(room) });
 }
 
 function resolveVotes(room) {
@@ -141,9 +142,8 @@ function resolveVotes(room) {
   const candidates = Object.keys(tally).filter(k => tally[k] === maxV && maxV > 0);
   const eliminatedId = candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : null;
   const eliminatedPlayer = eliminatedId ? room.players.find(p => p.id === eliminatedId) : null;
-  const caughtImpostor = eliminatedPlayer && eliminatedPlayer.isImpostor;
+  const caughtImpostor = !!(eliminatedPlayer && eliminatedPlayer.isImpostor);
 
-  // scoring
   if (caughtImpostor) {
     room.crewWins++;
     room.players.forEach(p => { if (!p.isImpostor) p.score += 3; });
@@ -158,21 +158,31 @@ function resolveVotes(room) {
   }
 
   room.phase = 'verdict';
-  broadcast(room, {
-    type: 'phase', phase: 'verdict',
-    state: roomPublicState(room),
-    theWord: room.theWord,
+  broadcastAll(room, { type: 'phase', phase: 'verdict', state: roomPublicState(room), theWord: room.theWord });
+}
+
+function doNextRound(room) {
+  room.currentRound++;
+  room.phase = 'roles';
+  assignRoles(room);
+  room.players.forEach(p => {
+    safeSend(p.ws, {
+      type: 'roleAssigned',
+      role: p.role,
+      word: p.isImpostor ? null : room.theWord,
+      topic: room.topic,
+      state: roomPublicState(room),
+    });
   });
 }
 
-// ─── WS HANDLER ──────────────────────────────────────────────────────────────
 wss.on('connection', ws => {
   ws.on('message', raw => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
     const { type } = msg;
 
-    // CREATE ROOM
+    // ── CREATE ROOM ──
     if (type === 'create') {
       let code = genCode();
       while (rooms[code]) code = genCode();
@@ -188,45 +198,34 @@ wss.on('connection', ws => {
         crewWins: 0, impWins: 0,
         verdict: null, theWord: '',
       };
-      const player = {
-        id: playerId, ws,
-        name: msg.name || 'Host',
-        avatar: msg.avatar || '🧑',
-        score: 0, connected: true,
-        isImpostor: false, role: null,
-        voted: false, eliminated: false,
-      };
+      const player = { id: playerId, ws, name: msg.name || 'Host', avatar: msg.avatar || '🧑', score: 0, connected: true, isImpostor: false, role: null, voted: false, readyForDiscussion: false };
       room.players.push(player);
       rooms[code] = room;
-      clients[ws] = { roomCode: code, playerId };
-      send(ws, { type: 'joined', playerId, roomCode: code, state: roomPublicState(room), topics: Object.entries(TOPICS).map(([k,v])=>({id:k,label:k,icon:v.icon})) });
+      clients.set(ws, { roomCode: code, playerId });
+      const topicList = Object.entries(TOPICS).map(([k,v]) => ({ id:k, label:k, icon:v.icon }));
+      safeSend(ws, { type: 'joined', playerId, roomCode: code, state: roomPublicState(room), topics: topicList });
       return;
     }
 
-    // JOIN ROOM
+    // ── JOIN ROOM ──
     if (type === 'join') {
-      const room = rooms[msg.code];
-      if (!room) { send(ws, { type: 'error', msg: 'Room not found' }); return; }
-      if (room.phase !== 'lobby') { send(ws, { type: 'error', msg: 'Game already started' }); return; }
-      if (room.players.length >= 15) { send(ws, { type: 'error', msg: 'Room is full (max 15)' }); return; }
+      const code = (msg.code || '').trim().toUpperCase();
+      const room = rooms[code];
+      if (!room) { safeSend(ws, { type: 'error', msg: 'Room not found. Check the code!' }); return; }
+      if (room.phase !== 'lobby') { safeSend(ws, { type: 'error', msg: 'Game already started!' }); return; }
+      if (room.players.length >= 15) { safeSend(ws, { type: 'error', msg: 'Room is full (max 15)' }); return; }
       const playerId = uuid();
-      const player = {
-        id: playerId, ws,
-        name: msg.name || `Player ${room.players.length + 1}`,
-        avatar: msg.avatar || '🧑',
-        score: 0, connected: true,
-        isImpostor: false, role: null,
-        voted: false, eliminated: false,
-      };
+      const player = { id: playerId, ws, name: msg.name || `Player ${room.players.length + 1}`, avatar: msg.avatar || '🧑', score: 0, connected: true, isImpostor: false, role: null, voted: false, readyForDiscussion: false };
       room.players.push(player);
-      clients[ws] = { roomCode: msg.code, playerId };
-      send(ws, { type: 'joined', playerId, roomCode: msg.code, state: roomPublicState(room), topics: Object.entries(TOPICS).map(([k,v])=>({id:k,label:k,icon:v.icon})) });
+      clients.set(ws, { roomCode: code, playerId });
+      const topicList = Object.entries(TOPICS).map(([k,v]) => ({ id:k, label:k, icon:v.icon }));
+      safeSend(ws, { type: 'joined', playerId, roomCode: code, state: roomPublicState(room), topics: topicList });
       broadcast(room, { type: 'playerJoined', state: roomPublicState(room) }, playerId);
       return;
     }
 
-    // All other messages need a room
-    const ctx = clients[ws];
+    // ── AUTHENTICATED MESSAGES ──
+    const ctx = clients.get(ws);
     if (!ctx) return;
     const room = rooms[ctx.roomCode];
     if (!room) return;
@@ -234,23 +233,23 @@ wss.on('connection', ws => {
     if (!player) return;
     const isHost = room.host === ctx.playerId;
 
-    if (type === 'settings' && isHost) {
+    if (type === 'settings' && isHost && room.phase === 'lobby') {
       if (msg.topic !== undefined) room.topic = msg.topic;
-      if (msg.totalRounds !== undefined) room.totalRounds = msg.totalRounds;
-      if (msg.timerDuration !== undefined) room.timerDuration = msg.timerDuration;
-      broadcast(room, { type: 'settingsChanged', state: roomPublicState(room) });
+      if (msg.totalRounds !== undefined) room.totalRounds = Number(msg.totalRounds);
+      if (msg.timerDuration !== undefined) room.timerDuration = Number(msg.timerDuration);
+      broadcastAll(room, { type: 'settingsChanged', state: roomPublicState(room) });
     }
 
     if (type === 'startGame' && isHost) {
-      if (room.players.length < 3) { send(ws, { type: 'error', msg: 'Need at least 3 players' }); return; }
-      room.phase = 'playing';
+      if (room.phase !== 'lobby') return;
+      if (room.players.length < 3) { safeSend(ws, { type: 'error', msg: 'Need at least 3 players to start!' }); return; }
+      room.phase = 'roles';
       room.currentRound = 1;
       room.crewWins = 0; room.impWins = 0;
       room.players.forEach(p => { p.score = 0; });
       assignRoles(room);
-      // Send each player their private role
       room.players.forEach(p => {
-        send(p.ws, {
+        safeSend(p.ws, {
           type: 'roleAssigned',
           role: p.role,
           word: p.isImpostor ? null : room.theWord,
@@ -258,14 +257,25 @@ wss.on('connection', ws => {
           state: roomPublicState(room),
         });
       });
-      broadcast(room, { type: 'phase', phase: 'discussion', state: roomPublicState(room) });
-      room.phase = 'discussion';
-      startTimerTick(room);
+    }
+
+    // Player taps "I'm ready" after seeing their role
+    if (type === 'readyForDiscussion') {
+      if (room.phase !== 'roles') return;
+      player.readyForDiscussion = true;
+      const readyCount = room.players.filter(p => p.readyForDiscussion).length;
+      const total = room.players.length;
+      broadcastAll(room, { type: 'waitingReady', readyCount, total, state: roomPublicState(room) });
+      if (readyCount === total) {
+        room.phase = 'discussion';
+        broadcastAll(room, { type: 'phase', phase: 'discussion', state: roomPublicState(room) });
+        startTimerTick(room);
+      }
     }
 
     if (type === 'pauseTimer' && isHost) {
       room.timerPaused = !room.timerPaused;
-      broadcast(room, { type: 'timerPaused', paused: room.timerPaused });
+      broadcastAll(room, { type: 'timerPaused', paused: room.timerPaused });
     }
 
     if (type === 'skipTimer' && isHost) {
@@ -278,37 +288,23 @@ wss.on('connection', ws => {
       if (player.voted) return;
       player.voted = true;
       room.votes[player.id] = msg.targetId || null;
-      broadcast(room, { type: 'voted', state: roomPublicState(room) });
-      const allVoted = room.players.every(p => p.voted);
-      if (allVoted) resolveVotes(room);
+      broadcastAll(room, { type: 'voted', state: roomPublicState(room) });
+      if (room.players.every(p => p.voted)) resolveVotes(room);
     }
 
     if (type === 'nextRound' && isHost) {
+      if (room.phase !== 'verdict') return;
       if (room.currentRound >= room.totalRounds) {
         room.phase = 'scoreboard';
-        broadcast(room, { type: 'phase', phase: 'scoreboard', state: roomPublicState(room), theWord: room.theWord });
+        broadcastAll(room, { type: 'phase', phase: 'scoreboard', state: roomPublicState(room), theWord: room.theWord });
         return;
       }
-      room.currentRound++;
-      room.phase = 'playing';
-      assignRoles(room);
-      room.players.forEach(p => {
-        send(p.ws, {
-          type: 'roleAssigned',
-          role: p.role,
-          word: p.isImpostor ? null : room.theWord,
-          topic: room.topic,
-          state: roomPublicState(room),
-        });
-      });
-      room.phase = 'discussion';
-      broadcast(room, { type: 'phase', phase: 'discussion', state: roomPublicState(room) });
-      startTimerTick(room);
+      doNextRound(room);
     }
 
     if (type === 'endGame' && isHost) {
       room.phase = 'scoreboard';
-      broadcast(room, { type: 'phase', phase: 'scoreboard', state: roomPublicState(room), theWord: room.theWord });
+      broadcastAll(room, { type: 'phase', phase: 'scoreboard', state: roomPublicState(room), theWord: room.theWord });
     }
 
     if (type === 'restartGame' && isHost) {
@@ -317,25 +313,24 @@ wss.on('connection', ws => {
       room.currentRound = 1;
       room.crewWins = 0; room.impWins = 0;
       room.votes = {}; room.verdict = null; room.theWord = '';
-      room.players.forEach(p => { p.score = 0; p.isImpostor = false; p.role = null; p.voted = false; });
-      broadcast(room, { type: 'phase', phase: 'lobby', state: roomPublicState(room) });
+      room.players.forEach(p => { p.score = 0; p.isImpostor = false; p.role = null; p.voted = false; p.readyForDiscussion = false; });
+      broadcastAll(room, { type: 'phase', phase: 'lobby', state: roomPublicState(room) });
     }
   });
 
   ws.on('close', () => {
-    const ctx = clients[ws];
+    const ctx = clients.get(ws);
     if (!ctx) return;
+    clients.delete(ws);
     const room = rooms[ctx.roomCode];
     if (!room) return;
     const player = room.players.find(p => p.id === ctx.playerId);
     if (player) player.connected = false;
     broadcast(room, { type: 'playerLeft', state: roomPublicState(room) });
-    delete clients[ws];
-    // Clean up empty rooms after 10 min
     const hasConnected = room.players.some(p => p.connected);
-    if (!hasConnected) setTimeout(() => { if (rooms[ctx.roomCode]) delete rooms[ctx.roomCode]; }, 600000);
+    if (!hasConnected) setTimeout(() => { delete rooms[ctx.roomCode]; }, 600000);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🕵️  Impostor Game running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`🕵️  Impostor Game running on port ${PORT}`));
